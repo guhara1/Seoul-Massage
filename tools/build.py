@@ -257,7 +257,7 @@ def menu_html(active):
         li("reviews", "/reviews/", "후기"),
         li("magazine", "/magazine/", "매거진",
            [("/magazine/", "전체 매거진")]
-           + [(f"/magazine/{p['slug']}/", p["menu"]) for p in MAGAZINE_POSTS]),
+           + [(f"/magazine/category/{c['slug']}/", c["name"]) for c in MAG_CATS]),
         li("customer", "/customer/", "고객센터", customer_sub),
         li("cta", "#", "", cta=True),
     ]
@@ -479,10 +479,13 @@ def cta_band(title="오늘 밤, 가까운 곳에서 휴식을 예약하세요", 
 <a class="btn btn-ghost" href="/reservation/">예약 안내 보기</a>
 </div></div></section>"""
 
-def byline():
-    return (f'<div class="byline">'
-            f'<span class="au">작성 · {BRAND} 운영팀</span>'
-            f'<span>감수 · 운영 책임자</span>'
+def byline(published=None):
+    if published:
+        head = f'<span class="au">발행 · {published.replace("-", ".")}</span>'
+    else:
+        head = (f'<span class="au">작성 · {BRAND} 운영팀</span>'
+                f'<span>감수 · 운영 책임자</span>')
+    return (f'<div class="byline">{head}'
             f'<span>최종 업데이트 · {UPDATED.replace("-", ".")}</span></div>')
 
 def article_ld(title, desc, path):
@@ -544,7 +547,7 @@ def render_lux(sections):
 def content_page(path, active, trail, *, title, desc, eyebrow, h1, lead,
                  sections, faq, data_note=None, service=None, show_price=False,
                  top_links=None, extra_schema=None, cta_title=None, area="서울특별시",
-                 subject=None, min_len=2050):
+                 subject=None, min_len=2050, published=None):
     links_html = ""
     if top_links:
         btns = ""
@@ -564,7 +567,7 @@ def content_page(path, active, trail, *, title, desc, eyebrow, h1, lead,
             f'<section class="lux-hero"><div class="wrap">'
             f'<span class="eyebrow"><span class="pulse"></span>{eyebrow}</span>'
             f'<h1 class="lux-h1">{h1}</h1>'
-            f'<p class="lux-lead">{lead}</p>{byline()}{links_html}</div></section>'
+            f'<p class="lux-lead">{lead}</p>{byline(published)}{links_html}</div></section>'
             f'<section class="block lux-body" style="padding-top:34px"><div class="wrap">'
             f'<div class="lux-grid">{toc_html}<div class="lux-main">{panels2}</div></div>'
             f'</div></section>'
@@ -573,7 +576,10 @@ def content_page(path, active, trail, *, title, desc, eyebrow, h1, lead,
         return body
 
     body = render(sections)
-    jsonld = [bc_ld(trail), article_ld(title, desc, path), faq_ld(faq)]
+    art = article_ld(title, desc, path)
+    if published:
+        art["datePublished"] = published
+    jsonld = [bc_ld(trail), art, faq_ld(faq)]
     if service:
         jsonld.append(service_ld(service[0], service[1], path, area))
         jsonld.append(offer_ld())
@@ -2515,51 +2521,212 @@ MAGAZINE_POSTS = [
     ("서울 전지역이 되나요?","위치·시간에 따라 다르며 예약 시 확인해 드립니다.")]},
 ]
 
+# 카테고리 정의 (글 수백 개 확장 대비 — 메뉴는 카테고리만 노출)
+MAG_CATS = [
+    {"slug": "guide", "name": "이용가이드"},
+    {"slug": "course-theme", "name": "코스·테마"},
+    {"slug": "tips", "name": "활용팁"},
+    {"slug": "area-station", "name": "지역·역세권"},
+]
+CAT_NAME = {c["slug"]: c["name"] for c in MAG_CATS}
+
+# 글별 메타: slug -> (발행일, 카테고리)
+_MAG_META = {
+    "chuljang-massage-first-guide": ("2026-06-05", "guide"),
+    "swedish-vs-aroma":             ("2026-06-03", "course-theme"),
+    "office-worker-recovery":       ("2026-05-30", "tips"),
+    "couple-anniversary-home-care": ("2026-05-27", "tips"),
+    "hygiene-safety-checklist":     ("2026-05-23", "guide"),
+    "station-area-tips":            ("2026-05-20", "area-station"),
+    "sports-recovery-massage":      ("2026-05-16", "course-theme"),
+    "sleep-aroma-routine":          ("2026-05-12", "course-theme"),
+    "price-time-guide":             ("2026-05-08", "guide"),
+    "area-guide-by-life":           ("2026-05-02", "area-station"),
+}
+# 글 하단 롱테일 내부링크: slug -> [(href, 앵커) ...] (각 5개, 지역/역세권 출장마사지 주제)
+_MAG_RELATED = {
+    "chuljang-massage-first-guide": [
+        ("/seoul/stations/gangnam-station/", "강남역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/hongik-univ-station/", "홍대입구역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/jamsil-station/", "잠실역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/gangnam-gu/", "강남구 출장마사지·홈타이 안내"),
+        ("/seoul/mapo-gu/", "마포구 출장마사지·홈타이 안내")],
+    "swedish-vs-aroma": [
+        ("/seoul/gangnam-gu/", "강남구 출장마사지·홈타이 안내"),
+        ("/seoul/seocho-gu/", "서초구 출장마사지·홈타이 안내"),
+        ("/seoul/songpa-gu/", "송파구 출장마사지·홈타이 안내"),
+        ("/seoul/stations/gangnam-station/", "강남역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/gangnam-gu/cheongdam-dong/", "청담동 출장마사지·홈타이 안내")],
+    "office-worker-recovery": [
+        ("/seoul/stations/gangnam-station/", "강남역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/yeouido-station/", "여의도역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/gangnam-gu/yeoksam-dong/", "역삼동 출장마사지·홈타이 안내"),
+        ("/seoul/yeongdeungpo-gu/yeouido-dong/", "여의도동 출장마사지·홈타이 안내"),
+        ("/seoul/gangnam-gu/samseong-dong/", "삼성동 출장마사지·홈타이 안내")],
+    "couple-anniversary-home-care": [
+        ("/seoul/songpa-gu/", "송파구 출장마사지·홈타이 안내"),
+        ("/seoul/gangnam-gu/", "강남구 출장마사지·홈타이 안내"),
+        ("/seoul/yongsan-gu/hannam-dong/", "한남동 출장마사지·홈타이 안내"),
+        ("/seoul/stations/jamsil-station/", "잠실역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/mapo-gu/", "마포구 출장마사지·홈타이 안내")],
+    "hygiene-safety-checklist": [
+        ("/seoul/gangnam-gu/", "강남구 출장마사지·홈타이 안내"),
+        ("/seoul/songpa-gu/", "송파구 출장마사지·홈타이 안내"),
+        ("/seoul/mapo-gu/", "마포구 출장마사지·홈타이 안내"),
+        ("/seoul/stations/gangnam-station/", "강남역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/hongik-univ-station/", "홍대입구역 출장마사지·홈타이 예약 안내")],
+    "station-area-tips": [
+        ("/seoul/stations/gangnam-station/", "강남역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/jamsil-station/", "잠실역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/hongik-univ-station/", "홍대입구역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/kondae-station/", "건대입구역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/seoul-station/", "서울역 출장마사지·홈타이 예약 안내")],
+    "sports-recovery-massage": [
+        ("/seoul/songpa-gu/", "송파구 출장마사지·홈타이 안내"),
+        ("/seoul/gangnam-gu/", "강남구 출장마사지·홈타이 안내"),
+        ("/seoul/stations/jamsil-station/", "잠실역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/seocho-gu/yangjae-dong/", "양재동 출장마사지·홈타이 안내"),
+        ("/seoul/gwangjin-gu/", "광진구 출장마사지·홈타이 안내")],
+    "sleep-aroma-routine": [
+        ("/seoul/gangnam-gu/", "강남구 출장마사지·홈타이 안내"),
+        ("/seoul/mapo-gu/", "마포구 출장마사지·홈타이 안내"),
+        ("/seoul/seocho-gu/", "서초구 출장마사지·홈타이 안내"),
+        ("/seoul/stations/seongsu-station/", "성수역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/yongsan-gu/hannam-dong/", "한남동 출장마사지·홈타이 안내")],
+    "price-time-guide": [
+        ("/seoul/gangnam-gu/", "강남구 출장마사지·홈타이 안내"),
+        ("/seoul/songpa-gu/", "송파구 출장마사지·홈타이 안내"),
+        ("/seoul/mapo-gu/", "마포구 출장마사지·홈타이 안내"),
+        ("/seoul/stations/gangnam-station/", "강남역 출장마사지·홈타이 예약 안내"),
+        ("/seoul/stations/jamsil-station/", "잠실역 출장마사지·홈타이 예약 안내")],
+    "area-guide-by-life": [
+        ("/seoul/gangnam-gu/", "강남구 출장마사지·홈타이 안내"),
+        ("/seoul/songpa-gu/", "송파구 출장마사지·홈타이 안내"),
+        ("/seoul/mapo-gu/", "마포구 출장마사지·홈타이 안내"),
+        ("/seoul/gangseo-gu/", "강서구 출장마사지·홈타이 안내"),
+        ("/seoul/nowon-gu/", "노원구 출장마사지·홈타이 안내")],
+}
+for _p in MAGAZINE_POSTS:
+    _p["date"], _p["cat"] = _MAG_META.get(_p["slug"], (UPDATED, "guide"))
+    _p["related"] = _MAG_RELATED.get(_p["slug"], [])
+
+MAG_PER_PAGE = 12           # 한 화면에 노출할 글 수(수백 개 확장 대비 페이지네이션)
+_MAG_PATHS = []             # 사이트맵용 매거진 목록 경로 누적
+
+def _mag_card(p):
+    d = p["date"].replace("-", ".")
+    cat = CAT_NAME.get(p["cat"], "매거진")
+    return (f'<a class="card reveal" href="/magazine/{p["slug"]}/">'
+            f'<div class="k">{cat}</div><h3>{p["menu"]}</h3>'
+            f'<p>{p["desc"][:66]}…</p>'
+            f'<div style="color:var(--dim);font-size:12.5px;margin-top:12px">'
+            f'<time datetime="{p["date"]}">{d}</time> · {cat}</div>'
+            f'<span class="more">글 보기 →</span></a>')
+
+def _mag_pager(base, cur, total):
+    if total <= 1:
+        return ""
+    u = lambda k: base if k == 1 else f"{base}page/{k}/"
+    nums = "".join(
+        (f'<a class="chip" href="{u(k)}" style="background:var(--grad);color:#1a1208;border-color:transparent">{k}</a>'
+         if k == cur else f'<a class="chip" href="{u(k)}">{k}</a>') for k in range(1, total + 1))
+    prev = f'<a class="btn btn-ghost" href="{u(cur-1)}">← 이전</a>' if cur > 1 else ""
+    nxt = f'<a class="btn btn-ghost" href="{u(cur+1)}">다음 →</a>' if cur < total else ""
+    return (f'<div style="display:flex;justify-content:center;align-items:center;gap:12px;'
+            f'flex-wrap:wrap;margin-top:34px">{prev}<div class="chips">{nums}</div>{nxt}</div>')
+
+def _mag_listing(base, posts, *, eyebrow, heading, lead, title, desc, prose, faqs,
+                 cat_name=None):
+    """매거진 목록 페이지(최신순·페이지네이션). base는 '/magazine/' 또는 카테고리 경로."""
+    posts = sorted(posts, key=lambda p: p["date"], reverse=True)
+    chunks = [posts[i:i + MAG_PER_PAGE] for i in range(0, len(posts), MAG_PER_PAGE)] or [[]]
+    total = len(chunks)
+    for i, chunk in enumerate(chunks, 1):
+        path = base if i == 1 else f"{base}page/{i}/"
+        # breadcrumb
+        if cat_name:
+            trail = [("/", "홈"), ("/magazine/", "매거진")]
+            trail += ([(None, cat_name)] if i == 1
+                      else [(base, cat_name), (None, f"{i}페이지")])
+        else:
+            trail = ([("/", "홈"), (None, "매거진")] if i == 1
+                     else [("/", "홈"), ("/magazine/", "매거진"), (None, f"{i}페이지")])
+        cards = "".join(_mag_card(p) for p in chunk) or '<p class="sec-lead">등록된 글이 없습니다.</p>'
+        page_lead = lead if i == 1 else f"{heading} {i}페이지입니다. {lead}"
+        body = (breadcrumb(trail) +
+            '<section class="block"><div class="wrap">'
+            f'<span class="eyebrow"><span class="pulse"></span>{eyebrow}</span>'
+            f'<h2 class="sec">{heading}</h2>'
+            f'<p class="sec-lead">{page_lead}</p>'
+            f'<div class="grid g3" style="margin-top:26px">{cards}</div>'
+            f'{_mag_pager(base, i, total)}</div></section>'
+            + hub_prose("MAGAZINE", "매거진은 이렇게 활용하세요", prose)
+            + faq_block(faqs) + cta_band())
+        item_list = {"@context": "https://schema.org", "@type": "Blog",
+            "name": heading, "url": BASE_URL + path,
+            "blogPost": [{"@type": "BlogPosting", "headline": p["title"], "datePublished": p["date"],
+                          "url": BASE_URL + f"/magazine/{p['slug']}/"} for p in chunk]}
+        t = title if i == 1 else f"{title} ({i}페이지)"
+        html = page(path, t, desc, "magazine", body, [bc_ld(trail), item_list])
+        n = text_len(html)
+        # 글이 적어 본문이 얇은 목록(카테고리/페이지)은 noindex + 사이트맵 제외
+        # (글이 쌓여 2,000자 이상이 되면 자동으로 색인 대상이 됨)
+        if n < 2000:
+            html = page(path, t, desc, "magazine", body, [bc_ld(trail), item_list], index=False)
+            write(path, html)
+        else:
+            write(path, html)
+            _MAG_PATHS.append(path)
+            _LEN_REPORT.append((path, n))
+
+_MAG_PROSE = [
+    "매거진은 처음 이용하는 분을 위한 입문 가이드부터 코스 비교, 위생·안전 체크리스트, 지역·역세권 이용 팁까지 실제 이용에 도움이 되는 정보를 담았습니다. 각 글은 관련 지역·역세권 안내로 연결되어 원하는 동네·역 출장마사지·홈타이 안내로 바로 이동할 수 있습니다.",
+    "글이 늘어나도 쉽게 찾을 수 있도록 이용가이드·코스·테마·활용팁·지역·역세권 카테고리로 나누고, 최신 글부터 순서대로 보여줍니다. 한 화면에 일정 수만 노출하고 나머지는 페이지로 넘겨, 수백 편으로 늘어나도 화면이 무거워지지 않습니다.",
+    "예약 전이라면 첫 이용 가이드와 비용·시간 선택 가이드를, 받을 관리를 고민 중이라면 스웨디시와 아로마테라피 비교 글을 먼저 읽어보시길 권합니다. 지역으로 찾는 분은 생활권별 안내가, 역으로 찾는 분은 역세권 이용 팁이 도움이 됩니다.",
+    "매거진의 정보는 일반적인 이용 안내를 돕기 위한 것으로, 실제 예약 가능 여부와 도착 시간은 위치·시간·배정 상황에 따라 달라집니다. 모든 글은 이완·휴식 목적의 건강관리 서비스를 전제로 하며, 통증·부상이 있는 경우 의료기관 진료를 먼저 권합니다.",
+]
+_MAG_FAQ = [
+    ("글이 많아지면 어떻게 찾나요?", "상단 카테고리(이용가이드·코스·테마·활용팁·지역·역세권)와 최신순 목록, 페이지 넘김으로 원하는 글을 쉽게 찾을 수 있습니다."),
+    ("글 내용이 의료적 조언인가요?", "아닙니다. 이완·휴식 목적의 일반 정보이며 진단·치료를 대신하지 않습니다."),
+    ("발행일은 어디서 보나요?", "각 글 카드와 글 상단에 발행일을 표기합니다."),
+]
+
 def build_magazine():
-    path = "/magazine/"
-    trail = [("/", "홈"), (None, "매거진")]
-    cards = "".join(
-        f'<a class="card reveal" href="/magazine/{p["slug"]}/"><div class="k">MAGAZINE</div>'
-        f'<h3>{p["menu"]}</h3><p>{p["desc"][:70]}…</p><span class="more">글 보기 →</span></a>'
-        for p in MAGAZINE_POSTS)
-    body = (breadcrumb(trail) +
-        '<section class="block"><div class="wrap">'
-        '<span class="eyebrow"><span class="pulse"></span>MAGAZINE</span>'
-        '<h2 class="sec">매거진</h2>'
-        '<p class="sec-lead">출장마사지·홈타이를 더 잘 이용하기 위한 가이드와 정보 글을 모았습니다. 코스 선택, 위생·안전, 지역·역세권 이용 팁을 확인하세요.</p>'
-        f'<div class="grid g3" style="margin-top:26px">{cards}</div></div></section>' +
-        hub_prose("MAGAZINE", "매거진은 이렇게 활용하세요", [
-            "매거진은 처음 이용하는 분을 위한 입문 가이드부터 코스 비교, 위생·안전 체크리스트, 지역·역세권 이용 팁까지 실제 이용에 도움이 되는 정보를 담았습니다. 각 글은 관련 지역·테마·코스 페이지로 연결되어 있어 원하는 안내로 바로 이동할 수 있습니다.",
-            "예약 전이라면 출장마사지·홈타이 첫 이용 가이드와 비용·시간 선택 가이드를, 받을 관리를 고민 중이라면 스웨디시와 아로마테라피 비교 글을 먼저 읽어보시길 권합니다. 지역으로 찾는 분은 생활권별 안내 글이, 역으로 찾는 분은 역세권 이용 팁이 도움이 됩니다.",
-            "코스를 어떻게 고를지 고민된다면 스웨디시와 아로마테라피 비교, 운동 후 회복 마사지, 숙면을 돕는 이완 루틴 글이 도움이 됩니다. 각 글은 해당 테마·코스 페이지와 연결되어 있어, 마음에 드는 관리를 발견하면 바로 상세 안내와 요금을 확인할 수 있습니다.",
-            "직장인이라면 야근 후 피로 회복 활용법과 역세권 이용 팁을, 커플·가족 단위라면 기념일 홈케어 준비 가이드를 참고하세요. 지역으로 찾는 분께는 생활권별 안내 글이 권역·자치구·대표 동을 한 번에 좁혀 가는 길잡이가 됩니다.",
-            "매거진의 정보는 일반적인 이용 안내를 돕기 위한 것으로, 실제 예약 가능 여부와 도착 시간은 위치·시간·배정 상황에 따라 달라집니다. 정확한 안내가 필요하면 글 하단의 예약 상담을 이용해 주세요.",
-            "모든 글은 이완·휴식 목적의 건강관리 서비스를 전제로 작성되었으며, 의료적 효과를 보장하지 않습니다. 통증·부상이 있는 경우에는 의료기관 진료를 먼저 권합니다."]) +
-        faq_block([
-            ("매거진 글은 어떻게 활용하나요?","원하는 주제의 글을 읽고 연결된 지역·테마·코스 페이지에서 바로 예약 정보를 확인하면 됩니다."),
-            ("글 내용이 의료적 조언인가요?","아닙니다. 이완·휴식 목적의 일반 정보이며 진단·치료를 대신하지 않습니다."),
-            ("새 글도 올라오나요?","이용에 도움이 되는 주제를 꾸준히 추가합니다.")]) +
-        cta_band())
-    item_list = {"@context": "https://schema.org", "@type": "Blog",
-        "name": f"{BRAND} 매거진", "url": BASE_URL + path,
-        "blogPost": [{"@type": "BlogPosting", "headline": p["title"],
-                      "url": BASE_URL + f"/magazine/{p['slug']}/"} for p in MAGAZINE_POSTS]}
-    html = page(path, "매거진 | 서울 출장마사지·홈타이 이용 가이드·정보",
-        "서울 출장마사지·홈타이 매거진 - 첫 이용 가이드, 코스 비교, 위생·안전, 지역·역세권 이용 팁 등 방문 마사지 정보 글을 제공합니다.",
-        "magazine", body, [bc_ld(trail), item_list])
-    write(path, html)
-    _LEN_REPORT.append((path, text_len(html)))
+    _mag_listing("/magazine/", MAGAZINE_POSTS,
+        eyebrow="MAGAZINE", heading="매거진",
+        lead="출장마사지·홈타이를 더 잘 이용하기 위한 가이드와 정보 글을 최신순으로 모았습니다. 카테고리와 페이지로 나누어 글이 늘어나도 쉽게 찾을 수 있습니다.",
+        title="매거진 | 서울 출장마사지·홈타이 이용 가이드·정보",
+        desc="서울 출장마사지·홈타이 매거진 - 첫 이용 가이드, 코스 비교, 위생·안전, 지역·역세권 이용 팁 등 방문 마사지 정보 글을 카테고리·최신순으로 제공합니다.",
+        prose=_MAG_PROSE, faqs=_MAG_FAQ)
+    # 카테고리별 목록
+    for c in MAG_CATS:
+        cposts = [p for p in MAGAZINE_POSTS if p["cat"] == c["slug"]]
+        _mag_listing(f"/magazine/category/{c['slug']}/", cposts,
+            eyebrow=f"MAGAZINE · {c['name']}", heading=f"{c['name']} 글",
+            lead=f"{c['name']} 카테고리의 출장마사지·홈타이 정보 글입니다. 최신순으로 정리했습니다.",
+            title=f"{c['name']} | 서울 출장마사지·홈타이 매거진",
+            desc=f"서울 출장마사지·홈타이 매거진 {c['name']} 카테고리 - 관련 정보 글을 최신순으로 제공합니다.",
+            prose=_MAG_PROSE, faqs=_MAG_FAQ, cat_name=c["name"])
 
 def build_magazine_posts():
     for p in MAGAZINE_POSTS:
         path = f"/magazine/{p['slug']}/"
-        trail = [("/", "홈"), ("/magazine/", "매거진"), (None, p["menu"])]
+        cat = CAT_NAME.get(p["cat"], "매거진")
+        trail = [("/", "홈"), ("/magazine/", "매거진"),
+                 (f"/magazine/category/{p['cat']}/", cat), (None, p["menu"])]
+        # 하단 롱테일 내부링크 섹션 (지역/역세권 출장마사지 주제 5개)
+        related = p.get("related", [])
+        sections = list(p["sections"])
+        if related:
+            sections.append(("함께 보면 좋은 지역·역세권 출장마사지·홈타이 안내", [
+                f"아래 지역과 지하철역의 출장마사지·홈타이 안내도 함께 확인해 보세요. 원하는 동네·역세권의 방문 가능 생활권과 예약 정보를 바로 볼 수 있습니다.",
+                ("ul", [f'<a href="{href}">{anchor}</a>' for href, anchor in related])]))
         content_page(path, "magazine", trail,
             title=p["title"], desc=p["desc"], eyebrow=p["eyebrow"], h1=p["h1"], lead=p["lead"],
-            sections=p["sections"], faq=p["faq"], data_note=p.get("data_note"),
-            subject=p["subject"],
+            sections=sections, faq=p["faq"], data_note=p.get("data_note"),
+            subject=p["subject"], published=p["date"],
             top_links=[("tel:" + PHONE_TEL, "예약문의", True), ("/magazine/", "매거진 전체"),
-                       ("/theme/", "테마별 안내"), ("/seoul/area/", "지역별 안내")],
+                       (f"/magazine/category/{p['cat']}/", f"{cat} 더보기"), ("/seoul/area/", "지역별 안내")],
             cta_title="궁금한 점이 있다면 예약 상담으로 도와드릴까요?")
 
 
@@ -2717,7 +2884,8 @@ def build_policies():
 def build_meta_files():
     # 색인 대상만 사이트맵에 포함(정책 3종은 noindex이므로 제외)
     urls = ["/", "/seoul/", "/seoul/area/", "/seoul/faq/", "/seoul/stations/",
-            "/theme/", "/course/", "/reservation/", "/guide/", "/reviews/", "/customer/", "/magazine/"]
+            "/theme/", "/course/", "/reservation/", "/guide/", "/reviews/", "/customer/"]
+    urls += _MAG_PATHS                                        # 매거진 목록·카테고리·페이지네이션
     urls += [f"/magazine/{p['slug']}/" for p in MAGAZINE_POSTS]
     urls += [f"/course/{c['slug']}/" for c in COURSES] + ["/course/price/", "/course/guide/"]
     urls += ["/reservation/hours/", "/reservation/place/", "/reservation/payment/",
