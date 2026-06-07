@@ -16,7 +16,7 @@ import hashlib
 
 from theme_assets import CSS, JS
 from data_seoul import (DISTRICTS, REGIONS_ORDER, REGION_SUMMARY,
-                        LINES, STATIONS, THEMES)
+                        LINES, STATION_GU, SLUG_OVERRIDE, STATION_CHAR, THEMES)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -69,7 +69,65 @@ TIME_PRICING = [
 DISTRICT_BY_SLUG = {d["slug"]: d for d in DISTRICTS}
 REGION_DISTRICTS = {r: [d for d in DISTRICTS if d["region"] == r] for r in REGIONS_ORDER}
 LINE_BY_NAME = {l["name"]: l for l in LINES}
-STATION_SLUGS = {s["name"]: s["slug"] for s in STATIONS}   # 페이지가 있는 역만
+GU_SLUG = {d["name"]: d["slug"] for d in DISTRICTS}
+
+# ---------------------------------------------------------------------------
+# 한글 → 로마자 (역 슬러그 자동 생성, 개정 로마자 표기 근사)
+# ---------------------------------------------------------------------------
+_LEAD = ['g','kk','n','d','tt','r','m','b','pp','s','ss','','j','jj','ch','k','t','p','h']
+_VOWEL = ['a','ae','ya','yae','eo','e','yeo','ye','o','wa','wae','oe','yo','u','wo','we','wi','yu','eu','ui','i']
+_TAIL = ['','k','k','k','n','n','n','t','l','k','m','l','l','l','p','l','m','p','p','t','t','ng','t','t','k','t','p','t']
+
+def romanize(s):
+    out = []
+    for ch in s:
+        o = ord(ch)
+        if 0xAC00 <= o <= 0xD7A3:
+            c = o - 0xAC00
+            out.append(_LEAD[c // 588] + _VOWEL[(c % 588) // 28] + _TAIL[c % 28])
+        elif ch.isalnum():
+            out.append(ch.lower())
+        # 그 외(공백·기호) 무시
+    slug = "".join(out)
+    slug = re.sub(r"[^a-z0-9]+", "", slug)
+    return slug or "station"
+
+# ---------------------------------------------------------------------------
+# 역 레지스트리 — 노선 데이터에서 자동 생성(환승역 1개 URL로 병합)
+#   각 역: name, slug, lines[], gu, gu_slug, dongs[], nearby[](인접 역명), char
+# ---------------------------------------------------------------------------
+def _build_stations():
+    reg, order, used_slug = {}, [], {}
+    for l in LINES:
+        for nm in l["stations"]:
+            if nm not in reg:
+                base = nm[:-1] if nm.endswith("역") else nm
+                slug = SLUG_OVERRIDE.get(nm) or (romanize(base) + "-station")
+                # 슬러그 충돌 방지
+                if slug in used_slug and used_slug[slug] != nm:
+                    slug = romanize(base) + f"-{len(order)}-station"
+                used_slug[slug] = nm
+                gu = STATION_GU.get(nm, "")
+                gu_slug = GU_SLUG.get(gu, "")
+                dongs = DISTRICT_BY_SLUG[gu_slug]["dongs"] if gu_slug else []
+                reg[nm] = {"name": nm, "slug": slug, "lines": [], "gu": gu,
+                           "gu_slug": gu_slug, "dongs": dongs, "nearby": [],
+                           "char": STATION_CHAR.get(nm, "")}
+                order.append(nm)
+            if l["name"] not in reg[nm]["lines"]:
+                reg[nm]["lines"].append(l["name"])
+    # 인접 역(같은 노선 상의 앞뒤 역) 수집
+    for l in LINES:
+        st = l["stations"]
+        for i, nm in enumerate(st):
+            for j in (i - 1, i + 1):
+                if 0 <= j < len(st) and st[j] not in reg[nm]["nearby"] and st[j] != nm:
+                    reg[nm]["nearby"].append(st[j])
+    return [reg[n] for n in order]
+
+STATIONS = _build_stations()
+STATION_SLUGS = {s["name"]: s["slug"] for s in STATIONS}
+STATION_BY_NAME = {s["name"]: s for s in STATIONS}
 
 # ---------------------------------------------------------------------------
 # 콘텐츠 변형 엔진 (도어웨이 회피 — 페이지마다 문장 구조를 달리함)
@@ -132,9 +190,11 @@ def menu_html(active):
         kids = [(f"/seoul/{d['slug']}/", d["name"]) for d in REGION_DISTRICTS[r]]
         area_sub.append((f"/seoul/area/#{slugify_region(r)}", r, kids))
 
-    # 지하철: 노선까지만
+    # 지하철: 노선 → 노선별 전체 역명(역명만 표시, 키워드 비반복)
     station_sub = [("/seoul/stations/", "서울 지하철역 전체")]
-    station_sub += [(f"/seoul/stations/{l['slug']}/", l["name"]) for l in LINES]
+    for l in LINES:
+        kids = [(f"/seoul/stations/{STATION_SLUGS[nm]}/", nm) for nm in l["stations"]]
+        station_sub.append((f"/seoul/stations/{l['slug']}/", l["name"], kids))
 
     theme_sub = [("/theme/", "전체 테마")]
     theme_sub += [(f"/theme/{t['slug']}/", t["name"]) for t in THEMES]
@@ -1046,8 +1106,10 @@ def build_stations_hub():
         f'<a class="card reveal" href="/seoul/stations/{l["slug"]}/"><div class="k">LINE</div>'
         f'<h3>{l["name"]}</h3><p>{l["desc"]}</p><span class="more">노선 보기 →</span></a>'
         for l in LINES)
+    total_stations = len(STATIONS)
     station_chips = "".join(
-        f'<a class="chip" href="/seoul/stations/{s["slug"]}/"><b>{s["name"]}</b></a>' for s in STATIONS)
+        f'<a class="chip" href="/seoul/stations/{s["slug"]}/"><b>{s["name"]}</b></a>'
+        for s in STATIONS if s["char"])
     body = (breadcrumb(trail) +
         '<section class="block"><div class="wrap">'
         '<span class="eyebrow"><span class="pulse"></span>STATIONS</span>'
@@ -1087,22 +1149,23 @@ def build_line_pages():
         name = l["name"]
         trail = [("/", "홈"), ("/seoul/", "서울 출장마사지"),
                  ("/seoul/stations/", "지하철역별 안내"), (None, name)]
-        majors = l["majors"]
-        major_str = ", ".join(majors)
-        major_links = [f'<a href="/seoul/stations/{STATION_SLUGS[m]}/">{m} 안내</a>'
-                       for m in majors if m in STATION_SLUGS]
+        sts = l["stations"]
+        cnt = len(sts)
+        ends = f"{sts[0]}~{sts[-1]}" if cnt > 1 else sts[0]
+        station_links = [f'<a href="/seoul/stations/{STATION_SLUGS[nm]}/">{nm}</a>' for nm in sts]
+        major_str = ", ".join(sts[:6])
         vl = lambda pool, salt: pick(l['slug'], pool, salt)
         sections = [
             (f"{name} 출장마사지·홈타이 이용 안내", [
                 f"{name}은 {l['desc']}",
                 f"{name} 라인은 역마다 생활권 성격이 달라, 같은 노선이라도 방문 가능 시간과 도착 시간이 다를 수 있습니다. " + pick(l['slug'], INTRO_BODY, "ib"),
                 pick(l['slug'], RESV_LINE, "rl")]),
-            (f"{name} 주요 역 안내", [
-                vl([f"{name}에서 검색 수요가 높은 주요 역은 {major_str} 등입니다. 역세권 방문은 정확한 위치를 기준으로 안내드리며, 출구별 페이지는 운영하지 않습니다.",
-                    f"{name}을 따라 이용 문의가 많은 역은 {major_str} 등입니다. 방문은 역 인근 정확한 위치를 기준으로 진행하며, 출구별 안내는 따로 두지 않습니다.",
-                    f"{name}의 주요 역으로는 {major_str} 등이 있습니다. 같은 역이라도 위치에 따라 도착 시간이 달라, 정확한 주소를 기준으로 안내드립니다."], "maj"),
-                ("ul", (major_links or ['<a href="/seoul/stations/">서울 지하철역 전체 안내</a>'])
-                       + ['<a href="/seoul/stations/">다른 노선 보기</a>'])]),
+            (f"{name} 전체 역 안내", [
+                vl([f"{name} 서울 구간은 {ends}까지 총 {cnt}개 역으로 이어집니다. 아래에서 역명을 누르면 해당 역 인근 방문 안내로 이동합니다.",
+                    f"{name}은 {ends} 구간에 걸쳐 {cnt}개 역이 있습니다. 원하는 역을 눌러 인근 생활권과 방문 안내를 확인하세요.",
+                    f"{name}을 따라 {ends}까지 {cnt}개 역이 놓여 있습니다. 각 역 페이지에서 인근 자치구·대표 동과 예약 안내를 제공합니다."], "maj"),
+                "역세권 방문은 정확한 위치를 기준으로 안내드리며, 출구별 페이지는 운영하지 않습니다.",
+                ("ul", station_links)]),
             (f"{name} 역세권 방문 안내", [
                 vl([f"{name} 인근 방문은 역 자체가 아니라 가까운 자택·오피스텔·숙소를 기준으로 진행됩니다.",
                     f"{name} 방문은 역 건물이 아니라 역 주변의 실제 방문지(자택·오피스텔·숙소)를 기준으로 안내됩니다.",
@@ -1153,6 +1216,7 @@ def build_line_pages():
 def build_station_pages():
     for s in STATIONS:
         name, slug = s["name"], s["slug"]
+        base = name[:-1] if name.endswith("역") else name
         path = f"/seoul/stations/{slug}/"
         trail = [("/", "홈"), ("/seoul/", "서울 출장마사지"),
                  ("/seoul/stations/", "지하철역별 안내"), (None, f"{name} 출장마사지")]
@@ -1160,29 +1224,51 @@ def build_station_pages():
         line_str = "·".join(lines)
         line_links = [f'<a href="/seoul/stations/{LINE_BY_NAME[ln]["slug"]}/">{ln} 안내</a>'
                       for ln in lines if ln in LINE_BY_NAME]
-        gu, gslug, near = s["gu"], s["gu_slug"], s["near"]
-        near_list = [x.strip() for x in near.split(",")]
+        gu, gslug = s["gu"], s["gu_slug"]
+        gu_label = gu or "서울"
+        gu_char = DISTRICT_BY_SLUG[gslug]["character"] if gslug else "여러 생활권이 이어지는 서울 도심"
+        dongs = s["dongs"][:4]
+        dong_names = [dd["name"] for dd in dongs]
+        near_str = ", ".join(dong_names[:3]) if dong_names else f"{gu_label} 일대"
+        # 인근 역(같은 노선 앞뒤) 링크
+        near_st = s["nearby"][:5]
+        near_st_links = [f'<a href="/seoul/stations/{STATION_SLUGS[n]}/">{n} 안내</a>'
+                         for n in near_st if n in STATION_SLUGS]
+        char = s["char"] or pick(slug, [
+            f"{gu_label} 생활권에 자리한 역세권",
+            f"{gu_label}의 주거·상권과 이어지는 역세권",
+            f"{gu_label} 일대 방문 수요가 꾸준한 역세권"], "char")
+
+        zone = [
+            f"{name} 주변은 {near_str} 등 {gu_label}의 생활권과 이어집니다. {gu_label}은 {gu_char}으로, 같은 역세권 안에서도 위치에 따라 분위기와 접근성이 다릅니다.",
+            "정확한 방문 가능 여부와 예상 도착 시간은 위치·예약 시간·배정 상황에 따라 달라지므로, 예약 시 가까운 출입구가 아니라 정확한 주소를 알려주시면 안내가 빠릅니다.",
+            ("h3", "역 인근 주거지·오피스텔"),
+            f"{name} 인근 자택·오피스텔로 방문할 때는 공동현관 출입 방법과 동·호수를 함께 알려주시면 도착이 빨라집니다.",
+            ("h3", "역 주변 숙소"),
+            f"{base} 인근 호텔·숙소 방문 시에는 건물명과 객실 번호, 프런트 출입 안내 여부를 알려주시면 원활합니다."]
+
+        rep_links = []
+        if gslug:
+            rep_links.append(f'<a href="/seoul/{gslug}/">{gu_label} 전체 안내</a>')
+            rep_links += [f'<a href="/seoul/{gslug}/{dd["slug"]}/">{dd["name"]} 안내</a>' for dd in dongs]
+        else:
+            rep_links.append('<a href="/seoul/area/">서울 지역별 안내</a>')
+        rep_links += near_st_links
+
         sections = [
             (f"{name} 출장마사지·홈타이 이용 안내", [
-                pick(slug, INTRO_OPEN, "intro").format(n=name) + f" {name}은 {s['character']}입니다.",
-                f"{name}은 {line_str}이 지나며 {gu} 생활권과 가깝습니다. 역 인근 자택·오피스텔·숙소로 방문하며, " + pick(slug, INTRO_BODY, "ib"),
+                pick(slug, INTRO_OPEN, "intro").format(n=name) + f" {name}은 {char}입니다.",
+                f"{name}은 {line_str}이 지나며 {gu_label} 생활권과 가깝습니다. 역 인근 자택·오피스텔·숙소로 방문하며, " + pick(slug, INTRO_BODY, "ib"),
                 pick(slug, RESV_LINE, "rl")]),
-            (f"{name} 인근 방문 가능 생활권", [
-                f"{name} 주변은 {near} 등 {gu}의 주요 생활권과 이어집니다. 같은 역세권 안에서도 위치에 따라 접근성과 분위기가 달라, 정확한 방문 가능 여부는 위치·예약 시간에 따라 안내드립니다.",
-                ("h3", f"{near_list[0]} 방향"),
-                f"{near_list[0]} 방향은 {name}에서 유동과 주거가 함께 모이는 생활권으로 방문 문의가 꾸준합니다.",
-                ("h3", "역 인근 숙소·오피스텔"),
-                f"{name} 인근 숙소·오피스텔로 방문할 때는 건물명과 출입 방법, 정확한 주소를 알려주시면 도착이 빨라집니다."]),
-            ("주변 대표 동 안내", [
-                f"{name}이 속한 {gu}의 대표 동 안내와 함께 보면 방문 위치를 더 정확히 정할 수 있습니다.",
-                ("ul", [f'<a href="/seoul/{gslug}/">{gu} 전체 안내</a>']
-                       + [f'<a href="/seoul/{gslug}/{dd["slug"]}/">{dd["name"]} 안내</a>'
-                          for dd in DISTRICT_BY_SLUG[gslug]["dongs"][:4]])]),
+            (f"{name} 인근 방문 가능 생활권", zone),
+            (f"{name} 주변 대표 지역 안내", [
+                f"{name}이 속한 {gu_label}의 자치구·대표 동 안내, 그리고 같은 노선의 인근 역과 함께 보면 방문 위치를 더 정확히 정할 수 있습니다.",
+                ("ul", rep_links)]),
             ("이용 가능한 노선 안내", [
-                f"{name}은 {line_str}을 이용할 수 있습니다. 각 노선의 역세권 흐름은 노선 페이지에서 확인하실 수 있습니다.",
+                f"{name}은 {line_str}을 이용할 수 있습니다. 환승역도 페이지는 하나로 운영하며, 각 노선의 역세권 흐름은 노선 페이지에서 확인하실 수 있습니다.",
                 ("ul", line_links + ['<a href="/seoul/stations/">서울 지하철역 전체</a>'])]),
             (f"{name} 주변에서 많이 찾는 테마", [
-                f"{name} 인근 방문에서도 이용 목적에 따라 선택하는 관리가 다릅니다. 관리 유형별 특징은 테마별 안내에서 확인하세요.",
+                f"{name} 인근 방문에서도 이용 목적에 따라 선택하는 관리가 다릅니다. 지역+테마 조합 페이지 대신, 관리 유형별 특징은 테마별 안내에서 확인하세요.",
                 theme_links_ul(slug, 4)]),
             ("예약·준비·위생 안내", [
                 f"{name} 인근 방문 예약은 시간대와 배정 상황에 따라 가능 여부가 달라집니다. 저녁·주말은 문의가 몰릴 수 있어 사전 예약을 권장드립니다.",
@@ -1191,28 +1277,31 @@ def build_station_pages():
         ]
         faq = [
             (f"{name} 인근 어디까지 방문 가능한가요?",
-             f"예약 시간, 정확한 위치, 배정 상황에 따라 달라질 수 있습니다. {near} 등 {gu} 생활권을 기준으로 안내드립니다."),
+             f"예약 시간, 정확한 위치, 배정 상황에 따라 달라질 수 있습니다. {near_str} 등 {gu_label} 생활권을 기준으로 안내드립니다."),
             (f"{name} 출구별로 예약이 나뉘나요?",
              "아니요. 출구별 페이지는 운영하지 않습니다. 예약 시 알려주신 정확한 위치를 기준으로 방문합니다."),
             (f"{name}은 어떤 역인가요?",
-             f"{name}은 {line_str}이 지나는 {gu}의 역으로, {s['character']}입니다."),
+             f"{name}은 {line_str}이 지나는 {gu_label}의 역으로, {char}입니다."),
             (f"{name} 근처 숙소도 방문하나요?",
              "네. 역 인근 자택·오피스텔·숙소로 방문하며, 정확한 주소와 출입 방법을 알려주시면 도착이 빨라집니다."),
             (f"{name}에서는 어떤 관리가 인기인가요?",
              "스웨디시·아로마·홈케어 등 목적에 따라 선택합니다. 자세한 내용은 테마별 안내에서 확인하실 수 있습니다."),
         ]
+        top = [("tel:" + PHONE_TEL, "예약문의", True)]
+        if gslug:
+            top.append((f"/seoul/{gslug}/", f"{gu_label} 안내"))
+        top += [("/seoul/stations/", "지하철역별 안내"), ("/theme/", "테마별 안내")]
         content_page(path, "stations", trail,
-            title=f"{name} 출장마사지·홈타이 | 서울 {name} 인근 방문 마사지 안내",
-            desc=f"서울 {name} 출장마사지·홈타이 안내 - {near} 등 인근 생활권 방문 가능 안내, 이용 노선({line_str}), 주변 대표 동, 예약 전 확인사항을 제공합니다.",
-            eyebrow=f"{gu} · {name}", h1=f"{name} 출장마사지·홈타이 예약 안내",
-            lead=f"서울 {name}({s['character']})에서 방문 마사지·홈타이 예약을 찾는 분들을 위한 안내입니다. {near} 인근 생활권을 기준으로 방문 안내와 예약 정보를 확인하세요.",
-            sections=sections, faq=faq,
-            top_links=[("tel:" + PHONE_TEL, "예약문의", True), (f"/seoul/{gslug}/", f"{gu} 안내"),
-                       ("/seoul/stations/", "지하철역별 안내"), ("/theme/", "테마별 안내")],
-            data_note=f"{name}({gu}) 인근은 위치에 따라 도착 시간 편차가 있습니다. 예약 시 정확한 주소와 출입 방법을 알려주시면 예상 도착 시간을 빠르게 안내해 드립니다.",
+            title=f"{name} 출장마사지·홈타이 | {gu_label} {name} 인근 방문 마사지 안내",
+            desc=f"{gu_label} {name} 인근 출장마사지·홈타이 예약 안내 페이지입니다. {near_str} 생활권과 이용 노선({line_str}), 예약 가능 시간, 이용 전 확인사항을 안내합니다.",
+            eyebrow=f"{gu_label} · {name}", h1=f"{name} 출장마사지·홈타이 예약 안내",
+            lead=f"서울 {name}({char})에서 방문 마사지·홈타이 예약을 찾는 분들을 위한 안내입니다. {near_str} 인근 생활권을 기준으로 방문 안내와 예약 정보를 확인하세요.",
+            sections=sections, faq=faq, subject=name,
+            top_links=top,
+            data_note=f"{name}({gu_label}) 인근은 위치에 따라 도착 시간 편차가 있습니다. 예약 시 정확한 주소와 출입 방법을 알려주시면 예상 도착 시간을 빠르게 안내해 드립니다.",
             service=(f"{name} 출장마사지·홈타이", f"서울 {name} 역세권 방문 건강관리 서비스"),
-            cta_title=f"{name} 인근 방문 예약을 도와드릴까요?", area=f"서울특별시 {gu}",
-            extra_schema=[localbiz_ld(name=f"{BRAND} {name}", area=f"서울특별시 {gu}", path=path)])
+            cta_title=f"{name} 인근 방문 예약을 도와드릴까요?", area=f"서울특별시 {gu_label}",
+            extra_schema=[localbiz_ld(name=f"{BRAND} {name}", area=f"서울특별시 {gu_label}", path=path)])
 
 
 # ---- 테마 허브 /theme/ ---------------------------------------------------

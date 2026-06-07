@@ -283,6 +283,8 @@ details>div{padding:0 22px 20px;color:var(--muted);font-size:14.5px;line-height:
 /* perf */
 #region,#process,#reviews,#about,#faq,.cta-band,.site-footer{content-visibility:auto;contain-intrinsic-size:auto 700px}
 .card,.note-card,.review,.price-card{contain:layout style}
+/* 노선별 역 목록(3단)이 길 때 데스크톱 플라이아웃 스크롤 */
+@media(min-width:1281px){.submenu .sub2{max-height:72vh;overflow-y:auto;overflow-x:hidden}}
 @media(hover:none){.glass,.floating{backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){.marquee-track,.pulse{animation:none}.reveal{opacity:1;transform:none}}
 @media(max-width:1280px){
