@@ -34,9 +34,9 @@ header{position:sticky;top:0;z-index:60;backdrop-filter:blur(14px);
 .brand .mark{width:34px;height:34px;border-radius:10px;background:var(--grad);display:grid;place-items:center;
   color:#1a1208;font-weight:800;font-family:"Cormorant Garamond",serif;font-style:italic;font-size:20px}
 .brand small{display:block;font-size:10.5px;letter-spacing:.16em;color:var(--gold);font-weight:700}
-.menu{list-style:none;display:flex;align-items:center;gap:4px;margin-left:auto}
+.menu{list-style:none;display:flex;align-items:center;gap:2px;margin-left:auto}
 .menu>li{position:relative}
-.menu>li>a{display:block;padding:10px 13px;font-size:14px;color:var(--text);border-radius:9px;font-weight:600}
+.menu>li>a{display:block;padding:9px 10px;font-size:13.5px;color:var(--text);border-radius:9px;font-weight:600;white-space:nowrap}
 .menu>li>a:hover{background:rgba(255,255,255,.05)}
 .menu>li>a.active{color:var(--gold)}
 .submenu{position:absolute;top:calc(100% + 6px);left:0;min-width:212px;list-style:none;padding:8px;
@@ -50,8 +50,8 @@ header{position:sticky;top:0;z-index:60;backdrop-filter:blur(14px);
 .submenu li.has-sub>a::after{content:"›";float:right;color:var(--dim);font-weight:700}
 .submenu .sub2{position:absolute;top:-9px;left:calc(100% + 7px);transform:translateX(6px)}
 .submenu li.has-sub:hover>.sub2,.submenu li.has-sub:focus-within>.sub2{opacity:1;visibility:visible;transform:none}
-.cta-pill{margin-left:6px;padding:11px 18px!important;background:var(--grad);color:#1a1208!important;
-  border-radius:999px;font-weight:800!important}
+.cta-pill{margin-left:6px;padding:10px 15px!important;background:var(--grad);color:#1a1208!important;
+  border-radius:999px;font-weight:800!important;white-space:nowrap}
 .toggle{display:none;margin-left:auto;background:none;border:1px solid var(--line);color:var(--text);
   font-size:20px;width:44px;height:44px;border-radius:11px;cursor:pointer}
 /* hero */
@@ -285,18 +285,20 @@ details>div{padding:0 22px 20px;color:var(--muted);font-size:14.5px;line-height:
 .card,.note-card,.review,.price-card{contain:layout style}
 @media(hover:none){.glass,.floating{backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){.marquee-track,.pulse{animation:none}.reveal{opacity:1;transform:none}}
-@media(max-width:1100px){
+@media(max-width:1280px){
   .toggle{display:block}
   .menu{position:fixed;inset:64px 0 auto 0;flex-direction:column;align-items:stretch;gap:2px;margin:0;
     padding:14px;background:var(--bg);border-bottom:1px solid var(--line);max-height:calc(100vh - 64px);
     overflow:auto;transform:translateY(-12px);opacity:0;visibility:hidden;transition:.25s}
   .menu.open{transform:none;opacity:1;visibility:visible}
-  .menu>li>a{padding:13px 12px}
+  .menu>li>a{padding:13px 12px;font-size:15px;white-space:normal}
   .submenu,.submenu .sub2{position:static;opacity:1;visibility:visible;transform:none;box-shadow:none;
     background:transparent;border:none;padding:0 0 6px 12px;min-width:0;left:auto;top:auto}
   .submenu .sub2{padding-left:14px}
   .submenu li.has-sub>a::after{content:""}
   .cta-pill{text-align:center}
+}
+@media(max-width:1100px){
   .hero-inner{grid-template-columns:1fr;gap:36px}
   .hero-visual{max-width:420px}
   .footer-grid{grid-template-columns:1fr 1fr}
