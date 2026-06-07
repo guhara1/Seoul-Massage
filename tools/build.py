@@ -33,12 +33,12 @@ INDEXNOW_KEY = "seoulmassage0000000000000000000"   # TODO: 새 키 발급
 UPDATED    = "2026-06-07"
 
 COMPANY = {
-    "name": "Seoul 마사지",
-    "ceo": "○○○",                       # TODO
-    "biz_no": "000-00-00000",            # TODO
-    "addr": "서울특별시",
-    "sales_no": "2026-서울-0000",        # TODO
-    "privacy_officer": "○○○",           # TODO
+    "name": "YH LAB",
+    "ceo": "김유환",
+    "biz_no": "815-26-00585",
+    "addr": "경기도 파주시 청석로 268",
+    "sales_no": "",                      # 통신판매업신고 (미발급 시 비표시)
+    "privacy_officer": "김유환",
 }
 
 # 코스 (홈/코스 페이지 공용)
@@ -304,7 +304,7 @@ def footer_html():
   <div><b>대표</b> {COMPANY['ceo']}</div>
   <div><b>사업자등록번호</b> {COMPANY['biz_no']}</div>
   <div><b>주소</b> {COMPANY['addr']}</div>
-  <div><b>통신판매업신고</b> {COMPANY['sales_no']}</div>
+  {f"<div><b>통신판매업신고</b> {COMPANY['sales_no']}</div>" if COMPANY['sales_no'] else ""}
   <div><b>개인정보보호책임자</b> {COMPANY['privacy_officer']}</div>
 </div>
 <div class="footer-policies">
@@ -2521,12 +2521,24 @@ MAGAZINE_POSTS = [
     ("서울 전지역이 되나요?","위치·시간에 따라 다르며 예약 시 확인해 드립니다.")]},
 ]
 
+# 추가 매거진 글(50편) — 별도 모듈에서 로드
+try:
+    from magazine_posts import POSTS as _EXTRA_POSTS
+except Exception:
+    _EXTRA_POSTS = []
+MAGAZINE_POSTS = MAGAZINE_POSTS + _EXTRA_POSTS
+
 # 카테고리 정의 (글 수백 개 확장 대비 — 메뉴는 카테고리만 노출)
 MAG_CATS = [
     {"slug": "guide", "name": "이용가이드"},
     {"slug": "course-theme", "name": "코스·테마"},
     {"slug": "tips", "name": "활용팁"},
     {"slug": "area-station", "name": "지역·역세권"},
+    {"slug": "region", "name": "지역별 마사지"},
+    {"slug": "swedish", "name": "스웨디시"},
+    {"slug": "visiting", "name": "출장마사지"},
+    {"slug": "korean-therapist", "name": "한국인 관리사"},
+    {"slug": "thai-therapist", "name": "태국 관리사"},
 ]
 CAT_NAME = {c["slug"]: c["name"] for c in MAG_CATS}
 
@@ -2607,8 +2619,13 @@ _MAG_RELATED = {
         ("/seoul/nowon-gu/", "노원구 출장마사지·홈타이 안내")],
 }
 for _p in MAGAZINE_POSTS:
-    _p["date"], _p["cat"] = _MAG_META.get(_p["slug"], (UPDATED, "guide"))
-    _p["related"] = _MAG_RELATED.get(_p["slug"], [])
+    if _p["slug"] in _MAG_META:            # 기존 10편: 메타·관련링크를 별도 맵에서 적용
+        _p["date"], _p["cat"] = _MAG_META[_p["slug"]]
+        _p["related"] = _MAG_RELATED.get(_p["slug"], [])
+    else:                                  # 추가 50편: 글 dict에 date/cat/related 포함
+        _p.setdefault("related", [])
+        _p.setdefault("cat", "guide")
+        _p.setdefault("date", UPDATED)
 
 MAG_PER_PAGE = 12           # 한 화면에 노출할 글 수(수백 개 확장 대비 페이지네이션)
 _MAG_PATHS = []             # 사이트맵용 매거진 목록 경로 누적
