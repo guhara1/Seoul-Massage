@@ -1,0 +1,51 @@
+name: IndexNow & Indexing notify
+
+# main 브랜치에 페이지/사이트맵이 바뀌어 푸시될 때마다
+# 빙·네이버 등에 변경 URL을 즉시 통보(IndexNow)합니다.
+# (선택) GOOGLE_INDEXING_SA 시크릿이 설정돼 있으면 Google Indexing API도 호출합니다.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/index.html'
+      - 'sitemap.xml'
+  workflow_dispatch:        # 수동 실행도 허용
+
+permissions:
+  contents: read
+
+concurrency:
+  group: indexnow-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2     # --changed 비교용(직전 커밋 대비)
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # Cloudflare Pages 배포가 반영될 시간을 잠깐 대기 (선택)
+      - name: Wait for deploy to propagate
+        run: sleep 90
+
+      - name: Submit changed URLs to IndexNow (Bing/Naver/Yandex)
+        run: python3 tools/indexnow.py --changed
+
+      # ── 선택: Google Indexing API (서비스계정 시크릿이 있을 때만) ──
+      - name: Google Indexing API (optional)
+        if: ${{ secrets.GOOGLE_INDEXING_SA != '' }}
+        env:
+          GOOGLE_INDEXING_SA: ${{ secrets.GOOGLE_INDEXING_SA }}
+        run: |
+          printf '%s' "$GOOGLE_INDEXING_SA" > /tmp/gsa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gsa.json
+          python3 -m pip install --quiet google-auth
+          python3 tools/google_indexing.py --all
+          rm -f /tmp/gsa.json

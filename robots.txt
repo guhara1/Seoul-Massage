@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /tools/
+
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://seoul-massage.pages.dev/sitemap.xml
+Host: seoul-massage.pages.dev
