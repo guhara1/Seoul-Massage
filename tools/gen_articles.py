@@ -7,9 +7,9 @@
 import os, re, datetime, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import articles_data            # noqa: populates ARTICLES
-import articles_data2           # noqa: populates ARTICLES
-from articles_data import ARTICLES, CATS
+import articles_base            # noqa: framework
+import a_region, a_swedish, a_visiting, a_korean, a_thai  # noqa: populate ARTICLES
+from articles_base import ARTICLES, CATS
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = "https://seoul-massage-at6.pages.dev"
@@ -184,22 +184,47 @@ def post_ld(a):
 
 # 최신순 정렬
 ordered = sorted(ARTICLES, key=lambda x: x["date"], reverse=True)
+MYSLUGS = {a["slug"] for a in ARTICLES}
+
+# 재실행 안전(idempotent) 헬퍼: 기존에 삽입한 내 카드/JSON-LD를 먼저 제거
+GRID_RE = re.compile(r'<div class="grid g3"[^>]*style="margin-top:26px">')
+
+def strip_my_cards(html):
+    for slug in MYSLUGS:
+        html = re.sub(r'<a class="card reveal" href="/magazine/' + re.escape(slug) + r'/">.*?</a>',
+                      '', html, flags=re.S)
+    return html
+
+def strip_my_ld(html):
+    for slug in MYSLUGS:
+        html = re.sub(r'\{"@type":"BlogPosting"[^{}]*?/magazine/' + re.escape(slug) + r'/"\},?',
+                      '', html)
+    # 콤마 정리
+    html = html.replace('"blogPost":[,', '"blogPost":[')
+    html = re.sub(r',\s*,', ',', html)
+    html = html.replace(',]', ']')
+    return html
+
+def insert_after_grid(html, cards):
+    m = GRID_RE.search(html)
+    if not m:
+        raise SystemExit("grid marker not found")
+    return html[:m.end()] + cards + html[m.end():]
 
 # ── 매거진 인덱스 갱신 ────────────────────────────────────────
 idx_path = os.path.join(ROOT, "magazine/index.html")
 idx = open(idx_path, encoding="utf-8").read()
-cards = "".join(card_html(a) for a in ordered)
-marker = '<div class="grid g3" style="margin-top:26px">'
-assert marker in idx, "index grid marker not found"
-idx = idx.replace(marker, marker + cards, 1)
-# JSON-LD blogPost 배열 앞에 삽입
+idx = strip_my_cards(idx)
+idx = insert_after_grid(idx, "".join(card_html(a) for a in ordered))
+idx = strip_my_ld(idx)
 lds = ",".join(post_ld(a) for a in ordered)
 idx = idx.replace('"blogPost":[', '"blogPost":[' + lds + ",", 1)
+idx = idx.replace('"blogPost":[' + lds + ",]", '"blogPost":[' + lds + "]")  # 비었던 경우
 open(idx_path, "w", encoding="utf-8").write(idx)
 print("매거진 인덱스 갱신 완료")
 
 # ── 카테고리 페이지 갱신 ──────────────────────────────────────
-empty = '<div class="grid g3" style="margin-top:26px"><p class="sec-lead">등록된 글이 없습니다.</p></div>'
+empty_p = '<p class="sec-lead">등록된 글이 없습니다.</p>'
 for cat_key, cat in CATS.items():
     cpath = os.path.join(ROOT, "magazine/category", cat_key, "index.html")
     if not os.path.exists(cpath):
@@ -207,13 +232,9 @@ for cat_key, cat in CATS.items():
     c = open(cpath, encoding="utf-8").read()
     items = [a for a in ordered if a["cat"] == cat_key]
     cards_c = "".join(card_html(a) for a in items)
-    filled = f'<div class="grid g3" style="margin-top:26px">{cards_c}</div>'
-    if empty in c:
-        c = c.replace(empty, filled, 1)
-    else:
-        # 이미 카드가 있거나 다른 형태면 grid 마커 뒤에 삽입
-        c = c.replace('<div class="grid g3" style="margin-top:26px">',
-                      '<div class="grid g3" style="margin-top:26px">' + cards_c, 1)
+    c = strip_my_cards(c).replace(empty_p, "")
+    c = insert_after_grid(c, cards_c)
+    c = strip_my_ld(c)
     if '"blogPost":[' in c:
         lds_c = ",".join(post_ld(a) for a in items)
         c = c.replace('"blogPost":[]', '"blogPost":[' + lds_c + "]", 1)
