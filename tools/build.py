@@ -26,8 +26,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_URL   = "https://seoul-massage.pages.dev"
 BRAND      = "Seoul 마사지"
 BRAND_SHORT= "Seoul"
-PHONE_DISP = "0000-0000-0000"          # TODO: 실제 예약 전화번호
-PHONE_TEL  = "+820000000000"           # TODO: tel: 링크용
+PHONE_DISP = "0508-202-4743"           # 예약 전화번호
+PHONE_TEL  = "+825082024743"           # tel: 링크용
 HOURS      = "연중무휴 · 24시간 상담"
 INDEXNOW_KEY = "seoulmassage0000000000000000000"   # TODO: 새 키 발급
 UPDATED    = "2026-06-07"
@@ -1018,6 +1018,7 @@ def build_district_pages():
             sections=sections, faq=faq,
             top_links=[("tel:" + PHONE_TEL, "예약문의", True), ("/seoul/area/", "지역별 안내"),
                        ("/theme/", "테마별 안내"), ("/course/", "코스안내")],
+            show_price=True,
             data_note=f"{gu}는 {region}에 속하며 평균 도착은 위치에 따라 {d['arrival']}분 내외입니다. 저녁·주말은 문의가 몰려 도착이 다소 길어질 수 있어 사전 예약을 권장드립니다.",
             service=(f"{gu} 출장마사지·홈타이", f"서울 {gu} 일대 방문 건강관리 서비스"),
             cta_title=f"{gu} 방문 예약, 지금 도와드릴까요?", area=f"서울특별시 {gu}",
@@ -1092,6 +1093,7 @@ def build_dong_pages():
                 sections=sections, faq=faq,
                 top_links=[("tel:" + PHONE_TEL, "예약문의", True), (f"/seoul/{gslug}/", f"{gu} 안내"),
                            ("/theme/", "테마별 안내"), ("/course/", "코스안내")],
+                show_price=True,
                 data_note=f"{name}({gu}) 일대는 위치에 따라 평균 {d['arrival']}분 내외로 도착합니다. 저녁·주말은 문의가 몰려 도착이 다소 길어질 수 있어 사전 예약을 권장드립니다.",
                 service=(f"{name} 출장마사지·홈타이", f"{gu} {name} 일대 방문 건강관리 서비스"),
                 cta_title=f"{name} 방문 예약, 지금 도와드릴까요?", area=f"서울특별시 {gu}",
@@ -1207,6 +1209,7 @@ def build_line_pages():
             sections=sections, faq=faq,
             top_links=[("tel:" + PHONE_TEL, "예약문의", True), ("/seoul/stations/", "지하철역별 안내"),
                        ("/seoul/area/", "지역별 안내"), ("/theme/", "테마별 안내")],
+            show_price=True,
             data_note=f"{name}은 역마다 생활권이 달라 도착 시간 편차가 큽니다. 예약 시 가까운 역과 정확한 주소를 함께 알려주시면 예상 도착 시간을 빠르게 안내해 드립니다.",
             service=(f"서울 {name} 출장마사지·홈타이", f"서울 {name} 역세권 방문 건강관리 서비스"),
             cta_title=f"{name} 역세권 방문 예약을 도와드릴까요?")
@@ -1296,7 +1299,7 @@ def build_station_pages():
             desc=f"{gu_label} {name} 인근 출장마사지·홈타이 예약 안내 페이지입니다. {near_str} 생활권과 이용 노선({line_str}), 예약 가능 시간, 이용 전 확인사항을 안내합니다.",
             eyebrow=f"{gu_label} · {name}", h1=f"{name} 출장마사지·홈타이 예약 안내",
             lead=f"서울 {name}({char})에서 방문 마사지·홈타이 예약을 찾는 분들을 위한 안내입니다. {near_str} 인근 생활권을 기준으로 방문 안내와 예약 정보를 확인하세요.",
-            sections=sections, faq=faq, subject=name,
+            sections=sections, faq=faq, subject=name, show_price=True,
             top_links=top,
             data_note=f"{name}({gu_label}) 인근은 위치에 따라 도착 시간 편차가 있습니다. 예약 시 정확한 주소와 출입 방법을 알려주시면 예상 도착 시간을 빠르게 안내해 드립니다.",
             service=(f"{name} 출장마사지·홈타이", f"서울 {name} 역세권 방문 건강관리 서비스"),
