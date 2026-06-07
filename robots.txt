@@ -9,5 +9,5 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://seoul-massage.pages.dev/sitemap.xml
-Host: seoul-massage.pages.dev
+Sitemap: https://seoul-massage-at6.pages.dev/sitemap.xml
+Host: seoul-massage-at6.pages.dev

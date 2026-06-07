@@ -23,7 +23,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # ---------------------------------------------------------------------------
 # 브랜드 / 사업자 상수  (실서비스 전 교체)
 # ---------------------------------------------------------------------------
-BASE_URL   = "https://seoul-massage.pages.dev"
+BASE_URL   = "https://seoul-massage-at6.pages.dev"
 BRAND      = "Seoul 마사지"
 BRAND_SHORT= "Seoul"
 PHONE_DISP = "0508-202-4743"           # 예약 전화번호
