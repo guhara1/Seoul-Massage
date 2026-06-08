@@ -1,16 +1,17 @@
 name: IndexNow & Indexing notify
 
-# main 브랜치에 페이지/사이트맵이 바뀌어 푸시될 때마다
+# 배포(기본) 브랜치에 페이지/사이트맵/RSS가 바뀌어 푸시될 때마다
 # 빙·네이버 등에 변경 URL을 즉시 통보(IndexNow)합니다.
 # (선택) GOOGLE_INDEXING_SA 시크릿이 설정돼 있으면 Google Indexing API도 호출합니다.
 
 on:
   push:
-    branches: [main]
+    branches: [claude/adoring-hopper-fHGfD, main]   # 실제 배포(기본) 브랜치
     paths:
       - '**/index.html'
       - 'sitemap.xml'
-  workflow_dispatch:        # 수동 실행도 허용
+      - 'rss.xml'
+  workflow_dispatch:        # 수동 실행 시 전체 URL 재제출
 
 permissions:
   contents: read
@@ -35,8 +36,14 @@ jobs:
       - name: Wait for deploy to propagate
         run: sleep 90
 
-      - name: Submit changed URLs to IndexNow (Bing/Naver/Yandex)
-        run: python3 tools/indexnow.py --changed
+      - name: Submit URLs to IndexNow (Bing/Naver/Yandex)
+        # 푸시 → 변경된 URL만, 수동 실행 → 전체 URL 재제출
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 tools/indexnow.py --all
+          else
+            python3 tools/indexnow.py --changed
+          fi
 
       # ── 선택: Google Indexing API (서비스계정 시크릿이 있을 때만) ──
       - name: Google Indexing API (optional)
