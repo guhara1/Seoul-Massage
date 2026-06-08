@@ -23,7 +23,7 @@
 import os, sys, json, re, glob, urllib.request, urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASE = "https://seoul-massage.pages.dev"
+BASE = "https://seoul-massage-at6.pages.dev"
 API = "https://indexing.googleapis.com/v3/urlNotifications:publish"
 SCOPE = "https://www.googleapis.com/auth/indexing"
 
