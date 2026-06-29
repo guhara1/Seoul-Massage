@@ -3008,6 +3008,11 @@ def build_meta_files():
     with open(os.path.join(ROOT, f"{INDEXNOW_KEY}.txt"), "w", encoding="utf-8") as f:
         f.write(INDEXNOW_KEY)
 
+    # Naver 웹마스터 도구 사이트 인증 파일
+    naver_verify = "naver6add6fdd87dfc14cd3fa9146ad807d64"
+    with open(os.path.join(ROOT, f"{naver_verify}.html"), "w", encoding="utf-8") as f:
+        f.write(f"naver-site-verification: {naver_verify}")
+
 
 # ---------------------------------------------------------------------------
 def main():
