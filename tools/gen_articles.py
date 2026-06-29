@@ -12,7 +12,7 @@ import a_region, a_swedish, a_visiting, a_korean, a_thai  # noqa: populate ARTIC
 from articles_base import ARTICLES, CATS
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASE = "https://seoul-massage-at6.pages.dev"
+BASE = "https://bespoke-froyo-f91c15.netlify.app"
 TEL = "tel:+825082024743"
 
 def slice_between(s, start, end, inclusive=True):

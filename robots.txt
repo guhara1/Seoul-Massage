@@ -9,6 +9,5 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://seoul-massage-at6.pages.dev/sitemap.xml
-Sitemap: https://seoul-massage-at6.pages.dev/rss.xml
-Host: seoul-massage-at6.pages.dev
+Sitemap: https://bespoke-froyo-f91c15.netlify.app/sitemap.xml
+Host: bespoke-froyo-f91c15.netlify.app
