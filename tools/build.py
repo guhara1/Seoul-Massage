@@ -330,7 +330,7 @@ def call_fab():
             f'<span class="call-fab-ic">{phone_svg}</span>'
             f'<span class="call-fab-tx">전화 예약<small>{PHONE_DISP}</small></span></a>')
 
-def page(path, title, desc, active, body, jsonld=None, og_type="website", index=True):
+def page(path, title, desc, active, body, jsonld=None, og_type="website", index=True, naver_verify=None):
     canonical = BASE_URL + path
     robots = ("index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
               if index else "noindex,follow")
@@ -342,6 +342,7 @@ def page(path, title, desc, active, body, jsonld=None, og_type="website", index=
                      + json.dumps(b, ensure_ascii=False, separators=(",", ":"))
                      + "</script>" for b in blocks)
     og_img = BASE_URL + "/assets/og-cover.jpg"
+    naver_meta = f'<meta name="naver-site-verification" content="{naver_verify}" />' if naver_verify else ""
     return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -352,6 +353,7 @@ def page(path, title, desc, active, body, jsonld=None, og_type="website", index=
 <meta name="robots" content="{robots}">
 <meta name="googlebot" content="{gbot}">
 <meta name="referrer" content="strict-origin-when-cross-origin">
+{naver_meta}
 <title>{title}</title>
 <meta name="description" content="{desc}">
 <meta name="author" content="{COMPANY['name']} 운영팀">
@@ -888,7 +890,7 @@ def build_home():
     jsonld = [org_ld(), website_ld(), localbiz_ld(), offer_ld(), faq_ld(HOME_FAQ)]
     html = page("/", f"{BRAND} | 서울 출장마사지·홈타이 전지역 방문 예약 안내",
                 "서울 출장마사지·홈타이 안내 페이지입니다. 서울 전지역, 자치구별 지역, 지하철역 인근, 테마별 코스와 예약 전 확인사항을 안내합니다. 연중무휴 24시간 상담.",
-                "home", body, jsonld)
+                "home", body, jsonld, naver_verify="26d4cfa9ce8a55a8611366c1ec6104bc362aebb3")
     write("/", html)
     _LEN_REPORT.append(("/", text_len(html)))
 
