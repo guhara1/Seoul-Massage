@@ -23,7 +23,7 @@
 import os, sys, json, re, glob, urllib.request, urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASE = "https://bespoke-froyo-f91c15.netlify.app"
+BASE = "https://seoul-massage1.netlify.app"
 API = "https://indexing.googleapis.com/v3/urlNotifications:publish"
 SCOPE = "https://www.googleapis.com/auth/indexing"
 
