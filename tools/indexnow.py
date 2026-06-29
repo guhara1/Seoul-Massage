@@ -17,7 +17,7 @@ https://<도메인>/<KEY>.txt 로 노출되어야 합니다.
 import os, sys, json, glob, re, subprocess, urllib.request, urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HOST = "seoul-massage-at6.pages.dev"               # 배포 도메인 (호스트만)
+HOST = "bespoke-froyo-f91c15.netlify.app"          # 배포 도메인 (호스트만)
 BASE = "https://" + HOST
 ENDPOINT = "https://api.indexnow.org/indexnow"   # 단일 제출 → 참여 엔진에 전파
 

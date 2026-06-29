@@ -10,4 +10,5 @@ User-agent: Google-Extended
 Allow: /
 
 Sitemap: https://bespoke-froyo-f91c15.netlify.app/sitemap.xml
+Sitemap: https://bespoke-froyo-f91c15.netlify.app/rss.xml
 Host: bespoke-froyo-f91c15.netlify.app

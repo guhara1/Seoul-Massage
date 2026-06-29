@@ -29,7 +29,7 @@ BRAND_SHORT= "Seoul"
 PHONE_DISP = "0508-202-4743"           # 예약 전화번호
 PHONE_TEL  = "+825082024743"           # tel: 링크용
 HOURS      = "연중무휴 · 24시간 상담"
-INDEXNOW_KEY = "seoulmassage0000000000000000000"   # TODO: 새 키 발급
+INDEXNOW_KEY = "2d763995ac27d8ecc05010a1ad165f6e"   # IndexNow 인증 키 (hex 32자)
 UPDATED    = "2026-06-07"
 
 COMPANY = {
@@ -2978,6 +2978,7 @@ def build_meta_files():
               "User-agent: ClaudeBot\nAllow: /\n"
               "User-agent: Google-Extended\nAllow: /\n\n"
               f"Sitemap: {BASE_URL}/sitemap.xml\n"
+              f"Sitemap: {BASE_URL}/rss.xml\n"
               f"Host: {BASE_URL.replace('https://','')}\n")
     with open(os.path.join(ROOT, "robots.txt"), "w", encoding="utf-8") as f:
         f.write(robots)
