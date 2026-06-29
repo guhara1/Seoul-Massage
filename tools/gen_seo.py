@@ -7,7 +7,7 @@
 import os, re, datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASE = "https://bespoke-froyo-f91c15.netlify.app"
+BASE = "https://seoul-massage1.netlify.app"
 SITE_NAME = "Seoul 마사지"
 SITE_DESC = "서울 출장마사지·홈타이 이용 가이드·정보 매거진"
 TODAY = datetime.date(2026, 6, 8)

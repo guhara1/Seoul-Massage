@@ -13,6 +13,7 @@ import os
 import json
 import re
 import hashlib
+import datetime
 
 from theme_assets import CSS, JS
 from data_seoul import (DISTRICTS, REGIONS_ORDER, REGION_SUMMARY,
@@ -23,7 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # ---------------------------------------------------------------------------
 # 브랜드 / 사업자 상수  (실서비스 전 교체)
 # ---------------------------------------------------------------------------
-BASE_URL   = "https://bespoke-froyo-f91c15.netlify.app"
+BASE_URL   = "https://seoul-massage1.netlify.app"
 BRAND      = "Seoul 마사지"
 BRAND_SHORT= "Seoul"
 PHONE_DISP = "0508-202-4743"           # 예약 전화번호
@@ -31,6 +32,10 @@ PHONE_TEL  = "+825082024743"           # tel: 링크용
 HOURS      = "연중무휴 · 24시간 상담"
 INDEXNOW_KEY = "2d763995ac27d8ecc05010a1ad165f6e"   # IndexNow 인증 키 (hex 32자)
 UPDATED    = "2026-06-07"
+BUILD_DATE = datetime.date.today().isoformat()      # sitemap lastmod(색인 신선도 신호)
+# 네이버 웹마스터 사이트 인증 코드(메인 페이지 메타). 여러 속성 등록 시 모두 출력.
+NAVER_VERIFY = ["26d4cfa9ce8a55a8611366c1ec6104bc362aebb3",
+                "6f196801f279ed9c18d90a5a9deedd692baee361"]
 
 COMPANY = {
     "name": "YH LAB",
@@ -342,7 +347,11 @@ def page(path, title, desc, active, body, jsonld=None, og_type="website", index=
                      + json.dumps(b, ensure_ascii=False, separators=(",", ":"))
                      + "</script>" for b in blocks)
     og_img = BASE_URL + "/assets/og-cover.jpg"
-    naver_meta = f'<meta name="naver-site-verification" content="{naver_verify}" />' if naver_verify else ""
+    if naver_verify:
+        codes = naver_verify if isinstance(naver_verify, list) else [naver_verify]
+        naver_meta = "".join(f'<meta name="naver-site-verification" content="{c}" />' for c in codes)
+    else:
+        naver_meta = ""
     return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -526,7 +535,7 @@ def service_ld(name, desc, path, area="서울특별시"):
             "areaServed": {"@type": "AdministrativeArea", "name": area},
             "url": BASE_URL + path}
 
-def reviews_ld():
+def reviews_ld(name=None, url=None):
     reviews_data = [
         {"title": "아로마 테라피 힐링", "rating": 5, "text": "들어서자마자 퍼지는 유칼립투스 향에 이미 힐링 모드. 오일이 정말 고급스러워서 피부에 흡수되는 느낌이 달랐어요. 마사지 받는 내내 숲속에 있는 기분이었고, 나갈 때는 머릿속이 완히 정리됐어요. 월요병이 싹 나았네요."},
         {"title": "PT 받는 느낌", "rating": 4, "text": "마사지 50% + 재활 운동 50%였어요. 뭉친 근육만 풀어주는 게 아니라, 왜 이렇게 뭉쳤는지 원인부터 설명해주시고 집에서 할 수 있는 스트레칭까지 알려주셨어요. 몸을 아는 선생님이라는 게 느껴졌네요. 주차만 편했으면 5점."},
@@ -551,17 +560,94 @@ def reviews_ld():
 
     rating_sum = sum(r["rating"] for r in reviews_data)
     rating_avg = rating_sum / len(reviews_data)
+    ratings = [r["rating"] for r in reviews_data]
 
-    return {
+    biz = {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
+        "name": name or BRAND,
+        "image": BASE_URL + "/assets/og-cover.jpg",
+        "telephone": PHONE_DISP,
+        "priceRange": "₩₩",
         "aggregateRating": {
             "@type": "AggregateRating",
             "ratingValue": f"{rating_avg:.1f}",
-            "reviewCount": len(reviews_data)
+            "reviewCount": len(reviews_data),
+            "bestRating": "5",
+            "worstRating": str(min(ratings))
         },
         "review": review_items
     }
+    if url:
+        biz["url"] = url
+    return biz
+
+
+def longtail_block(pairs, heading="함께 많이 찾는 검색"):
+    """롱테일 앵커 텍스트 내부링크 묶음(칩 UI 재사용)."""
+    if not pairs:
+        return ""
+    seen, chips = set(), ""
+    for href, label in pairs:
+        if href in seen:
+            continue
+        seen.add(href)
+        chips += f'<a class="chip" href="{href}"><b>{label}</b></a>'
+    return (f'<section class="block" id="related"><div class="wrap">'
+            f'<span class="eyebrow"><span class="pulse"></span>RELATED</span>'
+            f'<h2 class="sec">{heading}</h2>'
+            f'<p class="sec-lead">아래 지역·테마·코스 안내도 함께 확인해 보세요.</p>'
+            f'<div class="chips" style="margin-top:22px">{chips}</div>'
+            f'</div></section>')
+
+
+def _theme_lt(key, area_name, n=4):
+    """지역명을 결합한 롱테일 테마 앵커 묶음."""
+    chosen = picks(key, [(t["slug"], t["name"]) for t in THEMES], n, salt="longtail")
+    return [(f"/theme/{s}/", f"{area_name} {nm}") for s, nm in chosen]
+
+
+def longtail_district(d):
+    gu, slug, region = d["name"], d["slug"], d["region"]
+    pairs = []
+    for dd in d["dongs"][:6]:
+        pairs.append((f"/seoul/{slug}/{dd['slug']}/", f"{dd['name']} 출장마사지"))
+    for o in [x for x in DISTRICTS if x["region"] == region and x["slug"] != slug][:5]:
+        pairs.append((f"/seoul/{o['slug']}/", f"{o['name']} 홈타이"))
+    for st in d["stations"]:
+        if st in STATION_SLUGS:
+            pairs.append((f"/seoul/stations/{STATION_SLUGS[st]}/", f"{st} 마사지"))
+    pairs += _theme_lt(slug, gu)
+    return pairs[:16]
+
+
+def longtail_dong(d, dd):
+    gu, gslug = d["name"], d["slug"]
+    name, slug = dd["name"], dd["slug"]
+    pairs = []
+    for s in [x for x in d["dongs"] if x["slug"] != slug][:5]:
+        pairs.append((f"/seoul/{gslug}/{s['slug']}/", f"{s['name']} 홈타이"))
+    pairs.append((f"/seoul/{gslug}/", f"{gu} 출장마사지"))
+    for st in d["stations"]:
+        if st in STATION_SLUGS:
+            pairs.append((f"/seoul/stations/{STATION_SLUGS[st]}/", f"{st} 마사지"))
+    pairs += _theme_lt(slug, name)
+    return pairs[:16]
+
+
+def longtail_station(s):
+    name, slug = s["name"], s["slug"]
+    gu, gslug = s["gu"], s["gu_slug"]
+    pairs = []
+    for n in s["nearby"][:5]:
+        if n in STATION_SLUGS:
+            pairs.append((f"/seoul/stations/{STATION_SLUGS[n]}/", f"{n} 출장마사지"))
+    if gslug:
+        pairs.append((f"/seoul/{gslug}/", f"{gu} 홈타이"))
+        for dd in s["dongs"][:4]:
+            pairs.append((f"/seoul/{gslug}/{dd['slug']}/", f"{dd['name']} 마사지"))
+    pairs += _theme_lt(slug, name)
+    return pairs[:16]
 
 def render_lux(sections):
     toc, panels = [], []
@@ -586,7 +672,7 @@ def render_lux(sections):
 def content_page(path, active, trail, *, title, desc, eyebrow, h1, lead,
                  sections, faq, data_note=None, service=None, show_price=False,
                  top_links=None, extra_schema=None, cta_title=None, area="서울특별시",
-                 subject=None, min_len=2050, published=None):
+                 subject=None, min_len=2050, published=None, reviews=True, longtail=None):
     links_html = ""
     if top_links:
         btns = ""
@@ -611,6 +697,7 @@ def content_page(path, active, trail, *, title, desc, eyebrow, h1, lead,
             f'<div class="lux-grid">{toc_html}<div class="lux-main">{panels2}</div></div>'
             f'</div></section>'
             + (price_menu_block() if show_price else "")
+            + longtail_block(longtail)
             + faq_block(faq) + (cta_band(cta_title) if cta_title else cta_band()))
         return body
 
@@ -624,6 +711,8 @@ def content_page(path, active, trail, *, title, desc, eyebrow, h1, lead,
         jsonld.append(offer_ld())
     if extra_schema:
         jsonld += extra_schema
+    if reviews:
+        jsonld.append(reviews_ld(name=f"{BRAND} · {subject or h1}", url=BASE_URL + path))
     html = page(path, title, desc, active, body, jsonld, og_type="article")
     # 자동 보강: 본문이 짧으면 주제 맞춤 안내 섹션을 덧붙여 2,000자 이상 확보
     n = text_len(html)
@@ -815,6 +904,13 @@ def build_home():
     marquee_items = ["연중무휴 24시간 상담", "서울 전지역 방문", "당일 예약 가능",
                      "지하철역 인근 안내", "위생·안전 관리", "정찰 요금 안내"]
     marquee = "".join(f"<span>{x}</span>" for x in marquee_items * 2)
+    _pop_st = ["강남역", "잠실역", "홍대입구역", "서울역", "건대입구역", "신림역"]
+    home_longtail = (
+        [(f"/seoul/{x['slug']}/", f"{x['name']} 출장마사지") for x in DISTRICTS[:8]]
+        + [(f"/seoul/stations/{STATION_SLUGS[s]}/", f"{s} 마사지")
+           for s in _pop_st if s in STATION_SLUGS]
+        + [(f"/theme/{t['slug']}/", f"{t['name']} 홈타이") for t in THEMES[:6]]
+        + [("/course/price/", "출장마사지 가격"), ("/reservation/", "출장마사지 예약")])
     about_notes = [
         ("WHO · 누가 운영하나요",
          [f"{BRAND}는 서울 전역을 대상으로 하는 방문 건강관리 예약 안내 운영팀입니다.",
@@ -884,13 +980,15 @@ def build_home():
   <div class="grid g3" style="margin-top:28px">{reviews_html}</div>
 </div></section>
 {notes_block("ABOUT · WHO·HOW·WHY", BRAND + "가 일하는 방식", "신뢰할 수 있는 방문 건강관리를 위한 운영 원칙입니다.", about_notes)}
+{longtail_block(home_longtail, "지역·테마별 인기 안내 바로가기")}
 {faq_block(HOME_FAQ)}
 {cta_band()}
 """
-    jsonld = [org_ld(), website_ld(), localbiz_ld(), offer_ld(), faq_ld(HOME_FAQ)]
+    jsonld = [org_ld(), website_ld(), localbiz_ld(), offer_ld(), faq_ld(HOME_FAQ),
+              reviews_ld(url=BASE_URL + "/")]
     html = page("/", f"{BRAND} | 서울 출장마사지·홈타이 전지역 방문 예약 안내",
                 "서울 출장마사지·홈타이 안내 페이지입니다. 서울 전지역, 자치구별 지역, 지하철역 인근, 테마별 코스와 예약 전 확인사항을 안내합니다. 연중무휴 24시간 상담.",
-                "home", body, jsonld, naver_verify="26d4cfa9ce8a55a8611366c1ec6104bc362aebb3")
+                "home", body, jsonld, naver_verify=NAVER_VERIFY)
     write("/", html)
     _LEN_REPORT.append(("/", text_len(html)))
 
@@ -999,7 +1097,7 @@ def build_area_hub():
                      "url": BASE_URL + f"/seoul/{d['slug']}/"} for d in DISTRICTS]}
     html = page(path, "서울 지역별 안내 | 25개 자치구 출장마사지·홈타이 방문 안내",
         "서울 출장마사지·홈타이 지역별 안내 - 6개 권역, 25개 자치구별 방문 가능 지역과 대표 동 안내를 한곳에서 확인하세요.",
-        "area", body, [bc_ld(trail), item_list, offer_ld()])
+        "area", body, [bc_ld(trail), item_list, offer_ld(), reviews_ld(url=BASE_URL + path)])
     write(path, html)
     _LEN_REPORT.append((path, text_len(html)))
 
@@ -1070,7 +1168,8 @@ def build_district_pages():
             data_note=f"{gu}는 {region}에 속하며 평균 도착은 위치에 따라 {d['arrival']}분 내외입니다. 저녁·주말은 문의가 몰려 도착이 다소 길어질 수 있어 사전 예약을 권장드립니다.",
             service=(f"{gu} 출장마사지·홈타이", f"서울 {gu} 일대 방문 건강관리 서비스"),
             cta_title=f"{gu} 방문 예약, 지금 도와드릴까요?", area=f"서울특별시 {gu}",
-            extra_schema=[localbiz_ld(name=f"{BRAND} {gu}", area=f"서울특별시 {gu}", path=path), reviews_ld()])
+            extra_schema=[localbiz_ld(name=f"{BRAND} {gu}", area=f"서울특별시 {gu}", path=path)],
+            longtail=longtail_district(d))
 
 
 # ---- 대표 동 페이지 /seoul/{gu}/{dong}/ ----------------------------------
@@ -1145,7 +1244,8 @@ def build_dong_pages():
                 data_note=f"{name}({gu}) 일대는 위치에 따라 평균 {d['arrival']}분 내외로 도착합니다. 저녁·주말은 문의가 몰려 도착이 다소 길어질 수 있어 사전 예약을 권장드립니다.",
                 service=(f"{name} 출장마사지·홈타이", f"{gu} {name} 일대 방문 건강관리 서비스"),
                 cta_title=f"{name} 방문 예약, 지금 도와드릴까요?", area=f"서울특별시 {gu}",
-                extra_schema=[localbiz_ld(name=f"{BRAND} {name}", area=f"서울특별시 {gu} {name}", path=path)])
+                extra_schema=[localbiz_ld(name=f"{BRAND} {name}", area=f"서울특별시 {gu} {name}", path=path)],
+                longtail=longtail_dong(d, dd))
 
 
 # ---- 지하철 허브 /seoul/stations/ ----------------------------------------
@@ -1187,7 +1287,7 @@ def build_stations_hub():
                      "url": BASE_URL + f"/seoul/stations/{l['slug']}/"} for l in LINES]}
     html = page(path, "서울 지하철역별 안내 | 노선·역세권 출장마사지·홈타이",
         "서울 지하철역별 출장마사지·홈타이 안내 - 1~9호선 및 신림선·신분당선 등 노선별 페이지와 강남역·잠실역·홍대입구역 등 주요 역 안내를 제공합니다.",
-        "stations", body, [bc_ld(trail), item_list])
+        "stations", body, [bc_ld(trail), item_list, reviews_ld(url=BASE_URL + path)])
     write(path, html)
     _LEN_REPORT.append((path, text_len(html)))
 
@@ -1352,7 +1452,8 @@ def build_station_pages():
             data_note=f"{name}({gu_label}) 인근은 위치에 따라 도착 시간 편차가 있습니다. 예약 시 정확한 주소와 출입 방법을 알려주시면 예상 도착 시간을 빠르게 안내해 드립니다.",
             service=(f"{name} 출장마사지·홈타이", f"서울 {name} 역세권 방문 건강관리 서비스"),
             cta_title=f"{name} 인근 방문 예약을 도와드릴까요?", area=f"서울특별시 {gu_label}",
-            extra_schema=[localbiz_ld(name=f"{BRAND} {name}", area=f"서울특별시 {gu_label}", path=path)])
+            extra_schema=[localbiz_ld(name=f"{BRAND} {name}", area=f"서울특별시 {gu_label}", path=path)],
+            longtail=longtail_station(s))
 
 
 # ---- 테마 허브 /theme/ ---------------------------------------------------
@@ -1387,7 +1488,7 @@ def build_theme_hub():
                      "url": BASE_URL + f"/theme/{t['slug']}/"} for t in THEMES]}
     html = page(path, "테마별 안내 | 출장마사지·홈타이 관리 유형 안내",
         "출장마사지·홈타이 테마별 안내 - 스웨디시, 아로마테라피, 타이마사지, 홈케어, 스포츠·경락 등 관리 유형별 특징과 추천 대상을 안내합니다.",
-        "theme", body, [bc_ld(trail), item_list, offer_ld()])
+        "theme", body, [bc_ld(trail), item_list, offer_ld(), reviews_ld(url=BASE_URL + path)])
     write(path, html)
     _LEN_REPORT.append((path, text_len(html)))
 
@@ -1501,7 +1602,7 @@ def build_course():
         faq_block(course_faq) + cta_band())
     jsonld = [bc_ld(trail),
               service_ld("방문 마사지 코스", "피로 회복·아로마·스포츠·홈타이·커플·기업단체 방문 관리 코스", "/course/"),
-              offer_ld(), faq_ld(course_faq)]
+              offer_ld(), faq_ld(course_faq), reviews_ld(url=BASE_URL + path)]
     html = page(path, "코스안내 | 서울 출장마사지·홈타이 피로회복·아로마·스포츠 요금",
         "서울 출장마사지·홈타이 코스안내 - 피로 회복, 아로마, 스포츠, 홈타이, 커플·가족, 기업·단체 관리의 코스 설명과 정찰 요금을 안내합니다.",
         "course", body, jsonld)
@@ -2723,7 +2824,7 @@ def _mag_listing(base, posts, *, eyebrow, heading, lead, title, desc, prose, faq
             "blogPost": [{"@type": "BlogPosting", "headline": p["title"], "datePublished": p["date"],
                           "url": BASE_URL + f"/magazine/{p['slug']}/"} for p in chunk]}
         t = title if i == 1 else f"{title} ({i}페이지)"
-        html = page(path, t, desc, "magazine", body, [bc_ld(trail), item_list])
+        html = page(path, t, desc, "magazine", body, [bc_ld(trail), item_list, reviews_ld(url=BASE_URL + path)])
         n = text_len(html)
         # 글이 적어 본문이 얇은 목록(카테고리/페이지)은 noindex + 사이트맵 제외
         # (글이 쌓여 2,000자 이상이 되면 자동으로 색인 대상이 됨)
@@ -2966,6 +3067,7 @@ def build_meta_files():
         p = prio.get(u, "0.9" if u.count("/") <= 2 else ("0.8" if u.count("/") <= 3 else "0.75"))
         freq = "daily" if u == "/" else "weekly"
         items += (f"  <url><loc>{BASE_URL}{u}</loc>"
+                  f"<lastmod>{BUILD_DATE}</lastmod>"
                   f"<changefreq>{freq}</changefreq><priority>{p}</priority></url>\n")
     sitemap = ('<?xml version="1.0" encoding="UTF-8"?>\n'
                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

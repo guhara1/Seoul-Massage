@@ -9,6 +9,6 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://bespoke-froyo-f91c15.netlify.app/sitemap.xml
-Sitemap: https://bespoke-froyo-f91c15.netlify.app/rss.xml
-Host: bespoke-froyo-f91c15.netlify.app
+Sitemap: https://seoul-massage1.netlify.app/sitemap.xml
+Sitemap: https://seoul-massage1.netlify.app/rss.xml
+Host: seoul-massage1.netlify.app
