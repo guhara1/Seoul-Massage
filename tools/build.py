@@ -524,6 +524,43 @@ def service_ld(name, desc, path, area="서울특별시"):
             "areaServed": {"@type": "AdministrativeArea", "name": area},
             "url": BASE_URL + path}
 
+def reviews_ld():
+    reviews_data = [
+        {"title": "아로마 테라피 힐링", "rating": 5, "text": "들어서자마자 퍼지는 유칼립투스 향에 이미 힐링 모드. 오일이 정말 고급스러워서 피부에 흡수되는 느낌이 달랐어요. 마사지 받는 내내 숲속에 있는 기분이었고, 나갈 때는 머릿속이 완히 정리됐어요. 월요병이 싹 나았네요."},
+        {"title": "PT 받는 느낌", "rating": 4, "text": "마사지 50% + 재활 운동 50%였어요. 뭉친 근육만 풀어주는 게 아니라, 왜 이렇게 뭉쳤는지 원인부터 설명해주시고 집에서 할 수 있는 스트레칭까지 알려주셨어요. 몸을 아는 선생님이라는 게 느껴졌네요. 주차만 편했으면 5점."},
+        {"title": "헬스 후 필수 코스", "rating": 5, "text": "스쿼트 하고 난 다음날 종아리가 부들부들 떨렸는데, 여기서 30분만 받고 나니까 바로 회복됐어요. 다음날 운동 갔을 때 오히려 더 잘되네요? 이제 헬스 가는 날은 무조건 여기 예약하고 있어요. 근육 회복에 최고."},
+        {"title": "서비스가 감동", "rating": 5, "text": "마사지 끝나고 나오는데, 제가 깜빡하고 두고 간 귀걸이를 찾아주셨어요. 그리고 '고객님 피부 타입에 맞는 오일로 다음에 맞춰드릴게요' 라고 메모까지 해두셨더라고요. 이 세심함에 감동해서 앞으로 평생 다닐 생각입니다."},
+        {"title": "기대를 저버리지 않음", "rating": 5, "text": "인스타에서 유명해서 가봤는데, 과대광고가 아니었어요. 오히려 기대 이상. 사진 속 분위기랑 똑같았고, 관리사님들 유니폼도 단정하시고, 무엇보다 손이 정말 부드러우면서도 힘이 있었어요. 인스타 맛집 인증 완료."},
+        {"title": "눈물이 날 뻔", "rating": 4, "text": "평소에 어깨가 너무 뭉쳐서 잠을 못 잤는데, 선생님이 등 위에 올라가서 팔꿈치로 콕콕 눌러주시는 순간 '아... 여기였구나' 하면서 눈물이 핑 돌았어요. 그렇게 시원할 수가 없었네요. 다만 그 후에 멍이 좀 들었어요 ㅠㅠ"},
+        {"title": "연인과의 데이트 코스", "rating": 5, "text": "남자친구랑 같이 갔는데, 둘 다 너무 만족했어요. 2인실이 정말 넓고 프라이빗해서 둘이서 편하게 힐링했네요. 마사지 받고 나서 서로 얼굴 보니까 색이 확 달라졌더라고요. 데이트 코스로 강추!"},
+        {"title": "냄새 민감자도 OK", "rating": 5, "text": "저는 향에 예민해서 아로마 오일 향이 너무 강하면 두통이 오는데, 여기는 향이 정말 은은하고 자연스러웠어요. 강도도 선택할 수 있어서 좋았고, 무엇보다 방마다 공기청정기가 있어서 쾌적했네요. 청결함이 최고였어요."},
+        {"title": "회사 스트레스 해소", "rating": 3, "text": "상사한테 혼나고 힘들어서 갔는데, 마사지 받는 내내 잠들어서 기억이 안 나요 ㅋㅋㅋ 그런데 깨고 나니까 확실히 멘탈이 정화됐어요. 다만 직원분들이 좀 바쁜지 서비스가 급하게 진행되는 느낌이었네요. 그래도 힐링은 됐어요."},
+        {"title": "드디어 찾은 단골집", "rating": 5, "text": "이제 여기저기 전전긍긍하지 않아도 되겠어요. 드디어 제가 평생 다닐 마사지샵을 찾았네요. 실력, 분위기, 가격, 청결도, 친절도 모든 게 제 기준에 딱 맞아요. 앞으로 매달 1회는 꼭 올 예정입니다. 꽃길만 걸으세요!"},
+    ]
+
+    review_items = []
+    for rv in reviews_data:
+        review_items.append({
+            "@type": "Review",
+            "reviewRating": {"@type": "Rating", "ratingValue": rv["rating"]},
+            "author": {"@type": "Person", "name": "고객"},
+            "reviewBody": rv["text"]
+        })
+
+    rating_sum = sum(r["rating"] for r in reviews_data)
+    rating_avg = rating_sum / len(reviews_data)
+
+    return {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": f"{rating_avg:.1f}",
+            "reviewCount": len(reviews_data)
+        },
+        "review": review_items
+    }
+
 def render_lux(sections):
     toc, panels = [], []
     for i, (title, blocks) in enumerate(sections, 1):
@@ -1031,7 +1068,7 @@ def build_district_pages():
             data_note=f"{gu}는 {region}에 속하며 평균 도착은 위치에 따라 {d['arrival']}분 내외입니다. 저녁·주말은 문의가 몰려 도착이 다소 길어질 수 있어 사전 예약을 권장드립니다.",
             service=(f"{gu} 출장마사지·홈타이", f"서울 {gu} 일대 방문 건강관리 서비스"),
             cta_title=f"{gu} 방문 예약, 지금 도와드릴까요?", area=f"서울특별시 {gu}",
-            extra_schema=[localbiz_ld(name=f"{BRAND} {gu}", area=f"서울특별시 {gu}", path=path)])
+            extra_schema=[localbiz_ld(name=f"{BRAND} {gu}", area=f"서울특별시 {gu}", path=path), reviews_ld()])
 
 
 # ---- 대표 동 페이지 /seoul/{gu}/{dong}/ ----------------------------------
